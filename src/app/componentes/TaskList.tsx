@@ -2,9 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import db from '../lib/firestore'
-import { collection, addDoc, getDocs, query, orderBy } from 'firebase/firestore'
+import { collection, addDoc, getDocs, query, orderBy, deleteDoc, doc, updateDoc } from 'firebase/firestore'
 import Sidebar from './Sidebar'
-import TaskCard from './TaskCard'
 
 interface Task {
   id?: string
@@ -25,8 +24,8 @@ export default function TaskList() {
     priority: 'medium' as 'high' | 'medium' | 'low'
   })
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [editingTask, setEditingTask] = useState<Task | null>(null)
 
-  // Função para carregar as tasks do Firebase
   useEffect(() => {
     const loadTasks = async () => {
       try {
@@ -74,6 +73,55 @@ export default function TaskList() {
     }
   }
 
+  const handleEditTask = async (task: Task) => {
+    setEditingTask(task)
+    setNewTaskData({
+      title: task.title,
+      description: task.description,
+      tag: task.tag,
+      priority: task.priority
+    })
+    setIsModalOpen(true)
+  }
+
+  const handleUpdateTask = async () => {
+    if (!editingTask?.id) return
+
+    try {
+      const taskRef = doc(db, 'tasks', editingTask.id)
+      const updatedTask = {
+        ...newTaskData,
+        dueDate: editingTask.dueDate
+      }
+
+      await updateDoc(taskRef, updatedTask)
+      
+      setTasks(tasks.map(task => 
+        task.id === editingTask.id ? { ...updatedTask, id: editingTask.id } : task
+      ))
+
+      setIsModalOpen(false)
+      setEditingTask(null)
+      setNewTaskData({
+        title: '',
+        description: '',
+        tag: '',
+        priority: 'medium'
+      })
+    } catch (error) {
+      console.error('Erro ao atualizar task:', error)
+    }
+  }
+
+  const handleDeleteTask = async (taskId: string) => {
+    try {
+      await deleteDoc(doc(db, 'tasks', taskId))
+      setTasks(tasks.filter(task => task.id !== taskId))
+    } catch (error) {
+      console.error('Erro ao deletar task:', error)
+    }
+  }
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target
     setNewTaskData(prev => ({
@@ -90,7 +138,16 @@ export default function TaskList() {
           <h1 className="text-3xl font-semibold text-white">My Tasks</h1>
           <button 
             className="bg-[#6C5DD3] hover:bg-[#5B4EC2] px-6 py-2 rounded-lg flex items-center gap-2 text-sm font-medium"
-            onClick={() => setIsModalOpen(true)}
+            onClick={() => {
+              setEditingTask(null)
+              setNewTaskData({
+                title: '',
+                description: '',
+                tag: '',
+                priority: 'medium'
+              })
+              setIsModalOpen(true)
+            }}
           >
             <span className="text-lg">+</span> New Task
           </button>
@@ -105,7 +162,23 @@ export default function TaskList() {
                 key={task.id} 
                 className="bg-[#2C2C2C] rounded-lg p-6 border-l-4 border-l-red-500 hover:bg-[#333333] transition-colors"
               >
-                <h3 className="text-xl font-semibold mb-2">{task.title}</h3>
+                <div className="flex justify-between items-start mb-2">
+                  <h3 className="text-xl font-semibold">{task.title}</h3>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleEditTask(task)}
+                      className="text-blue-500 hover:text-blue-400"
+                    >
+                      Editar
+                    </button>
+                    <button
+                      onClick={() => task.id && handleDeleteTask(task.id)}
+                      className="text-red-500 hover:text-red-400"
+                    >
+                      Excluir
+                    </button>
+                  </div>
+                </div>
                 <p className="text-gray-400 mb-4">{task.description}</p>
                 <div className="flex items-center gap-4">
                   <span className="text-[#6C5DD3] bg-[#6C5DD320] px-3 py-1 rounded-md text-sm">
@@ -130,7 +203,9 @@ export default function TaskList() {
         {isModalOpen && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
             <div className="bg-[#2C2C2C] p-6 rounded-lg w-96">
-              <h2 className="text-xl font-semibold mb-4">Nova Tarefa</h2>
+              <h2 className="text-xl font-semibold mb-4">
+                {editingTask ? 'Editar Tarefa' : 'Nova Tarefa'}
+              </h2>
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm mb-1">Título</label>
@@ -176,16 +251,25 @@ export default function TaskList() {
                 </div>
                 <div className="flex justify-end gap-2 mt-6">
                   <button
-                    onClick={() => setIsModalOpen(false)}
+                    onClick={() => {
+                      setIsModalOpen(false)
+                      setEditingTask(null)
+                      setNewTaskData({
+                        title: '',
+                        description: '',
+                        tag: '',
+                        priority: 'medium'
+                      })
+                    }}
                     className="px-4 py-2 bg-gray-600 rounded-md"
                   >
                     Cancelar
                   </button>
                   <button
-                    onClick={handleAddTask}
+                    onClick={editingTask ? handleUpdateTask : handleAddTask}
                     className="px-4 py-2 bg-[#6C5DD3] rounded-md"
                   >
-                    Adicionar
+                    {editingTask ? 'Atualizar' : 'Adicionar'}
                   </button>
                 </div>
               </div>
