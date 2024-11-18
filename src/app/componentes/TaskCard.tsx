@@ -5,8 +5,8 @@ interface TaskCardProps {
   description: string;
   tag: string;
   dueDate: string;
-  priority: 'low' | 'medium' | 'high'; // Tipagem mais específica para priority
-  onClick?: () => void; // Tornando o onClick configurável
+  priority: 'low' | 'medium' | 'high';
+  onClick?: () => void; /
 }
 
 export default function TaskCard({ 
